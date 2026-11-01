@@ -20,14 +20,16 @@ function makeCard(server, index) {
   card.className = `realm ${server.color}`;
   card.dataset.address = server.address;
   card.innerHTML = `<button class="realm-bar" type="button" aria-expanded="false" aria-controls="realm-details-${index}">
-    <span class="realm-number">${String(index + 1).padStart(2, '0')}</span><span class="realm-emblem">${escapeHtml(server.name.slice(0, 1))}</span>
+    <span class="realm-number">${String(index + 1).padStart(2, '0')}</span><span class="realm-emblem"><img class="server-image" alt="" hidden><b>${escapeHtml(server.name.slice(0, 1))}</b></span>
     <span class="realm-title"><strong>${escapeHtml(server.name)}</strong><small>${escapeHtml(server.address)}</small></span>
     <span class="realm-type">${escapeHtml(server.mode)}</span><span class="bar-players"><strong class="players">—</strong><small>PLAYERS</small></span>
     <span class="status-badge loading"><i></i> Checking</span><span class="expand-icon">＋</span></button>
     <div class="realm-details" id="realm-details-${index}" hidden>
       <div class="player-meter"><div class="meter-label"><span>PLAYER CAPACITY</span><strong class="capacity">Waiting for status</strong></div><div class="meter-track"><i></i></div></div>
+      <div class="history-panel"><div class="history-heading"><div><small>OBSERVED PLAYER HISTORY</small><strong class="history-summary">Collecting real samples…</strong></div><span class="history-range">LAST 60 CHECKS</span></div><svg class="player-chart" viewBox="0 0 600 120" role="img" aria-label="Observed player-count history graph"><path class="chart-gridline" d="M0 20H600M0 60H600M0 100H600"/><polyline class="chart-line" points=""/></svg><div class="uptime-heading"><small>RECENT STATUS CHECKS</small><span class="uptime-value">Gathering samples</span></div><div class="uptime-strip" aria-label="Recent observed online and offline checks"></div></div>
       <div class="detail-grid"><div><small>GAME VERSION</small><strong class="version">Unknown</strong></div><div><small>SOFTWARE</small><strong class="software">Unknown</strong></div><div><small>RESPONSE</small><strong class="latency">—</strong></div><div><small>PORT / HOST</small><strong class="host-info">—</strong></div></div>
-      <div class="motd-box"><small>SERVER MESSAGE</small><p class="motd">Waiting for server response…</p></div>
+      <div class="motd-box"><small>SERVER MESSAGE / MOTD</small><p class="motd">Waiting for server response…</p></div>
+      <div class="server-error" hidden><small>SERVER / API DIAGNOSTIC</small><p class="error-message"></p></div>
       <div class="sample-row"><div><small>PLAYERS ONLINE</small><div class="sample-players">Player list is not public.</div></div><button class="copy" type="button" title="Copy server address">COPY ADDRESS</button></div>
     </div>`;
   const button = $('.realm-bar', card);
@@ -60,7 +62,64 @@ function flatten(value) {
   return value == null ? '' : String(value).replace(/§[0-9a-fk-or]/gi, '').trim();
 }
 
-function updateCard(card, data, elapsed) {
+const HISTORY_KEY = 'minebeacon:observations:v1';
+const HISTORY_LIMIT = 60;
+const HISTORY_WINDOW = 24 * 60 * 60 * 1000;
+
+function readHistory() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}');
+    const cutoff = Date.now() - HISTORY_WINDOW;
+    for (const address of Object.keys(saved)) saved[address] = Array.isArray(saved[address]) ? saved[address].filter(sample => sample.at > cutoff).slice(-HISTORY_LIMIT) : [];
+    return saved;
+  } catch { return {}; }
+}
+const observations = readHistory();
+
+function recordObservation(address, data, errorMessage = '') {
+  const list = observations[address] || (observations[address] = []);
+  list.push({ at: Date.now(), online: Boolean(data?.online), players: data?.online && Number.isFinite(Number(data.players?.online)) ? Number(data.players.online) : null, note: errorMessage || apiErrorMessage(data) });
+  observations[address] = list.slice(-HISTORY_LIMIT);
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(observations)); } catch { /* Private browsing or quota: this-session samples still work. */ }
+}
+
+function renderHistory(card) {
+  const list = observations[card.dataset.address] || [];
+  const values = list.filter(sample => sample.online && Number.isFinite(sample.players));
+  const line = $('.chart-line', card);
+  const chart = $('.player-chart', card);
+  const circlesHost = chart;
+  chart.querySelectorAll('.sample-dot').forEach(dot => dot.remove());
+  const max = Math.max(1, ...values.map(sample => sample.players));
+  const coords = values.map(sample => ({ x: list.length < 2 ? 300 : list.indexOf(sample) * 600 / (list.length - 1), y: 100 - sample.players / max * 82, sample }));
+  line.setAttribute('points', coords.map(point => `${point.x},${point.y}`).join(' '));
+  coords.forEach(point => {
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('class', 'sample-dot'); dot.setAttribute('cx', point.x); dot.setAttribute('cy', point.y); dot.setAttribute('r', '3.5');
+    dot.setAttribute('aria-label', `${point.sample.players} players at ${new Date(point.sample.at).toLocaleTimeString()}`);
+    circlesHost.append(dot);
+  });
+  const latest = values.at(-1)?.players;
+  const trend = values.length ? `${values.length} real samples · now ${latest.toLocaleString()} · peak ${max.toLocaleString()}` : 'Collecting real samples…';
+  $('.history-summary', card).textContent = trend;
+  const strip = $('.uptime-strip', card);
+  strip.replaceChildren();
+  list.forEach(sample => {
+    const tick = document.createElement('i');
+    tick.className = sample.online ? 'check-online' : 'check-offline';
+    tick.title = `${new Date(sample.at).toLocaleString()} · ${sample.online ? `${sample.players ?? 0} players` : (sample.note || 'Offline')}`;
+    strip.append(tick);
+  });
+  const onlineCount = list.filter(sample => sample.online).length;
+  $('.uptime-value', card).textContent = list.length ? `${Math.round(onlineCount / list.length * 100)}% observed online · ${list.length} checks` : 'Gathering samples';
+}
+
+function apiErrorMessage(data) {
+  const errors = [...(Array.isArray(data?.debug?.errors) ? data.debug.errors : []), ...(Array.isArray(data?.errors) ? data.errors : [])];
+  return errors.map(error => typeof error === 'string' ? error : [error.type, error.message].filter(Boolean).join(': ')).filter(Boolean).join(' · ');
+}
+
+function updateCard(card, data, elapsed, requestError = '') {
   const online = Boolean(data.online);
   const badge = $('.status-badge', card);
   badge.className = `status-badge ${online ? 'online' : 'offline'}`;
@@ -75,11 +134,23 @@ function updateCard(card, data, elapsed) {
   $('.software', card).textContent = data.software || data.software_name || 'Not reported';
   $('.latency', card).textContent = online ? `${elapsed} ms` : 'No response';
   $('.host-info', card).textContent = [data.hostname || data.ip || '—', data.port || ''].filter(Boolean).join(':');
-  const motd = flatten(data.motd?.clean || data.motd?.raw || data.motd?.html) || (online ? 'This server did not provide a message.' : 'No message available while offline.');
+  const motd = flatten(data.motd?.clean || data.motd?.raw || data.motd?.html) || (online ? 'This server did not provide a message.' : 'No MOTD was returned with the offline status.');
   $('.motd', card).textContent = motd.slice(0, 400);
   const sample = Array.isArray(data.players?.list) ? data.players.list.slice(0, 12).map(item => typeof item === 'string' ? item : item.name).filter(Boolean) : [];
-  $('.sample-players', card).textContent = sample.length ? sample.join(' · ') : (online ? 'No public player sample.' : 'No player data while offline.');
+  $('.sample-players', card).textContent = sample.length ? sample.join(' · ') : (online ? 'Server did not expose a public player sample.' : 'No player list is available while offline.');
+  const error = requestError || apiErrorMessage(data) || (!online ? 'The status API reports this server as offline but supplied no more specific error. The outage could be on the server, network, or status-service side.' : '');
+  const errorBox = $('.server-error', card);
+  errorBox.hidden = !error;
+  $('.error-message', card).textContent = error;
+  const icon = $('.server-image', card);
+  if (data.icon) {
+    icon.onerror = () => { icon.hidden = true; $('.realm-emblem b', card).hidden = false; };
+    icon.src = data.icon; icon.hidden = false; $('.realm-emblem b', card).hidden = true;
+  }
+  else { icon.hidden = true; $('.realm-emblem b', card).hidden = false; }
   $('.realm-bar', card).setAttribute('aria-label', `${card.querySelector('.realm-title strong').textContent}: ${online ? 'online' : 'offline'}, ${onlineCount ?? 'unknown'} players. Expand for details.`);
+  recordObservation(card.dataset.address, data, requestError);
+  renderHistory(card);
 }
 
 async function refreshCard(card) {
@@ -88,9 +159,9 @@ async function refreshCard(card) {
   badge.innerHTML = '<i></i> CHECKING';
   const started = performance.now();
   try { updateCard(card, await checkServer(card.dataset.address), Math.round(performance.now() - started)); }
-  catch {
-    badge.className = 'status-badge offline'; badge.innerHTML = '<i></i> UNAVAILABLE';
-    updateCard(card, { online: false }, 0);
+  catch (error) {
+    const message = error?.name === 'TimeoutError' ? 'Status request timed out after 10 seconds.' : `Status request failed: ${error?.message || 'Unknown network error.'}`;
+    updateCard(card, { online: false }, 0, message);
   }
 }
 
