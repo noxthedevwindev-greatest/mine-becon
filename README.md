@@ -1,12 +1,12 @@
 # MineBeacon
 
-A responsive, Minecraft-inspired server status dashboard. It checks a starter watchlist and lets visitors look up any Java/Bedrock server hostname or IP.
+A responsive Minecraft server status scout featuring a ten-server rotating list, expandable status bars, a Java/Bedrock address search, and a dark-first theme that follows the visitor's system color preference.
 
-The watchlist makes one status API request per second, rotating between servers. With three servers, each individual server is checked about every three seconds. Polling pauses while the tab is hidden. Status APIs may cache results, so this cadence does not guarantee the Minecraft server itself was freshly pinged every second.
+Each expanded server row displays online/max players, a capacity meter, version, detected software, response time, resolved host/port, MOTD, and any public player samples returned by the status API. A single API request is made per second and rotates through the list, so each of the ten listed realms is checked approximately every ten seconds. The provider may cache status results, and public server data may be unavailable or incomplete.
 
 ## Free status API
 
-The browser calls `https://api.mcsrvstat.us/3/{address}` directly. No API key or backend is required. The API is community-provided, so requests can be rate-limited or temporarily unavailable. The UI reports that without breaking the page. Please review the provider's usage policy before operating at scale.
+The browser calls `https://api.mcsrvstat.us/3/{address}` directly. No API key or backend is required. The service documents support for status, player counts, version, software, MOTD and other optional fields. API availability, caching, and rate policies are outside this site's control. Review the provider's usage terms before operating at scale.
 
 ## Run locally
 
@@ -14,17 +14,12 @@ Open `index.html` in a browser, or serve this directory with any static file ser
 
 ## Publish with GitHub Pages
 
-1. Create a GitHub repository and push these files to its default branch.
-2. In repository **Settings → Pages**, choose **Deploy from a branch**, select the default branch and `/ (root)`, then save.
-3. GitHub Pages will publish the static site. No build step is required.
+The included GitHub Actions workflow deploys the static site from the `master` branch. Push changes to trigger a deployment.
 
 ## Name ideas
 
-- Blockwatch (current working name)
-- CraftPulse
-- ServerSprout
-- ChunkSignal
 - MineBeacon
+- CraftPulse
+- ChunkSignal
+- ServerSprout
 - Redstone Radar
-
-Check availability of your chosen repository name and domain before settling on branding.
