@@ -239,6 +239,34 @@
   });
   window.addEventListener('minebeacon:catalog', event => applyCatalog(event.detail));
   if (window.MineBeaconCatalog?.state) applyCatalog(window.MineBeaconCatalog.state);
+  const applyCustomServers = servers => {
+    for (const item of servers || []) {
+      const address = item.address;
+      if (!address) continue;
+      const existing = allServers.get(normalize(address));
+      const patch = {
+        name: item.name || address,
+        address,
+        edition: editionName(item.edition),
+        description: item.description || '',
+        tags: existing?.tags || [],
+        custom: true,
+        catalog: existing?.catalog || false,
+        online: existing?.online || false,
+        count: existing?.count ?? null,
+        maxPlayers: existing?.maxPlayers ?? null,
+        live: existing?.live || false,
+        uptime: existing?.uptime ?? null,
+        votes: existing?.votes ?? null,
+        version: existing?.version || ''
+      };
+      upsert(address, patch);
+    }
+    refreshTags();
+    updateSummary();
+  };
+  window.addEventListener('minebeacon:custom-servers', event => applyCustomServers(event.detail));
+  if (window.MineBeaconCommunity?.servers) applyCustomServers(window.MineBeaconCommunity.servers);
   const connect = () => {
     updateLiveStatus();
     try { socket = new WebSocket('wss://minetrack.me'); }

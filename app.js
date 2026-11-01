@@ -159,6 +159,57 @@ function applyCatalog(state) {
 window.addEventListener('minebeacon:catalog', event => applyCatalog(event.detail));
 if (window.MineBeaconCatalog) applyCatalog(window.MineBeaconCatalog.state);
 
+function applyCommunityServers(servers = []) {
+  for (const server of servers) {
+    if (!server.address || !server.name) continue;
+    const mode = server.edition === 'BEDROCK' ? 'Bedrock' : server.edition === 'CROSS_PLAY' ? 'Java + Bedrock' : 'Java';
+    const card = addServerCard({ name: server.name, address: server.address, mode: `${mode} · Community`, color: 'cyan' });
+    card.dataset.custom = 'true';
+    card.dataset.search = [server.description, server.edition, 'community custom'].filter(Boolean).join(' ');
+    if (server.description) $('.motd', card).textContent = server.description;
+    if (!card.dataset.catalogSource && !card.dataset.minetrackLive && !card.dataset.customChecked) {
+      card.dataset.customChecked = 'true';
+      refreshCard(card);
+    }
+  }
+  arrangeServers();
+}
+window.addEventListener('minebeacon:custom-servers', event => applyCommunityServers(event.detail));
+if (window.MineBeaconCommunity?.servers) applyCommunityServers(window.MineBeaconCommunity.servers);
+
+$('#custom-server-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const data = new FormData(form);
+  const server = {
+    name: String(data.get('name') || '').trim(),
+    address: String(data.get('address') || '').trim().toLowerCase(),
+    edition: String(data.get('edition') || 'JAVA'),
+    description: String(data.get('description') || '').trim(),
+    website: String(data.get('website') || '')
+  };
+  const message = $('#custom-server-message');
+  const button = form.querySelector('button[type="submit"]');
+  if (!server.name || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d{1,5})?$/i.test(server.address)) {
+    message.textContent = 'Enter a valid name and server hostname, optionally followed by a port.';
+    return;
+  }
+  button.disabled = true;
+  window.MineBeaconCommunity?.saveLocal(server);
+  message.textContent = 'Added to this browser. Checking whether shared submissions are connected…';
+  try {
+    if (window.MineBeaconCommunity?.base && !server.website) {
+      const result = await window.MineBeaconCommunity.submit(server);
+      message.textContent = result.message || 'Submitted for shared-directory review.';
+    } else {
+      message.textContent = 'Added to this browser. Shared submissions are not connected yet.';
+    }
+    form.reset();
+  } catch (error) {
+    message.textContent = `${error.message} Your entry remains saved on this browser.`;
+  } finally { button.disabled = false; }
+});
+
 $('#server-filter').addEventListener('input', arrangeServers);
 $('#server-sort').addEventListener('change', arrangeServers);
 $('#favorites-filter').addEventListener('click', event => {
@@ -517,3 +568,5 @@ startMinetrackFeed();
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 }
+const communityStyles = document.createElement('link');
+communityStyles.rel = 'stylesheet'; communityStyles.href = 'profile-history.css'; document.head.append(communityStyles);

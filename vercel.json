@@ -1,0 +1,9 @@
+{
+  "framework": null,
+  "functions": {
+    "api/**/*.js": { "runtime": "nodejs22.x", "maxDuration": 60 }
+  },
+  "crons": [
+    { "path": "/api/cron/snapshot", "schedule": "0 5 * * *" }
+  ]
+}

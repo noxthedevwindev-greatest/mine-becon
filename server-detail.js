@@ -1,4 +1,12 @@
 (() => {
+  for (const source of ['api-config.js', 'site-cache.js']) {
+    const script = document.createElement('script');
+    script.src = source;
+    script.async = false;
+    document.head.append(script);
+  }
+  const historyStyles = document.createElement('link');
+  historyStyles.rel = 'stylesheet'; historyStyles.href = 'profile-history.css'; document.head.append(historyStyles);
   const q = selector => document.querySelector(selector);
   const address = new URLSearchParams(location.search).get('address')?.trim() || '';
   const els = {
@@ -8,12 +16,18 @@
   };
   let feedIndex = -1;
   let samples = [];
+  let yearlySamples = [];
+  let historyMode = '24h';
   let maxPlayers = 1;
   let apiOnline = null;
   let liveOnline = null;
   let socket;
   let retry = 1000;
   const offlineReasons = new Map();
+  const yearSelect = q('#history-year');
+  const yearNote = q('#profile-yearly-note');
+  const yearNow = new Date().getUTCFullYear();
+  for (let year = yearNow; year >= yearNow - 5; year -= 1) yearSelect.add(new Option(String(year), String(year)));
   const updateStatus = (count, error = '', timestamp = Date.now() / 1000) => {
     const online = count !== null && count !== undefined && Number.isFinite(Number(count));
     const players = online ? Number(count) : null;
@@ -25,7 +39,7 @@
     if (error) offlineReasons.set('live', error);
     else offlineReasons.delete('live');
     showDiagnostic();
-    if (samples.length) els.summary.textContent = `${samples.length.toLocaleString()} Minetrack samples · peak ${maxPlayers.toLocaleString()} players · latest ${online ? players.toLocaleString() : 'offline'}`;
+    if (historyMode === '24h' && samples.length) els.summary.textContent = `${samples.length.toLocaleString()} Minetrack samples · peak ${maxPlayers.toLocaleString()} players · latest ${online ? players.toLocaleString() : 'offline'}`;
   };
   const showDiagnostic = () => {
     const messages = [...offlineReasons.values()].filter(Boolean);
@@ -40,7 +54,8 @@
 
   const draw = () => {
     els.chart.querySelectorAll('.chart-segment').forEach(line => line.remove());
-    const available = samples.filter(point => point.online && Number.isFinite(point.players));
+    const points = historyMode === 'year' ? yearlySamples : samples;
+    const available = points.filter(point => point.online && Number.isFinite(point.players));
     maxPlayers = Math.max(1, ...available.map(point => point.players));
     let segment = [];
     const flush = () => {
@@ -51,24 +66,33 @@
       els.chart.insertBefore(line, els.chart.querySelector('.chart-hover-dot'));
       segment = [];
     };
-    samples.forEach((point, index) => {
+    points.forEach((point, index) => {
       if (!point.online || !Number.isFinite(point.players)) { flush(); return; }
-      segment.push({ x: samples.length > 1 ? index * 600 / (samples.length - 1) : 300, y: 118 - point.players / maxPlayers * 96 });
+      segment.push({ x: points.length > 1 ? index * 600 / (points.length - 1) : 300, y: 118 - point.players / maxPlayers * 96 });
     });
     flush();
-    els.range.textContent = samples.length ? 'MINETRACK · 24 HOURS · 1-MIN SAMPLES' : 'NO UPSTREAM HISTORY';
-    els.summary.textContent = samples.length ? `${samples.length.toLocaleString()} Minetrack samples · peak ${maxPlayers.toLocaleString()} players · latest ${available.at(-1)?.players.toLocaleString() ?? 'offline'}` : (feedIndex >= 0 ? 'Waiting for Minetrack to send daily history…' : 'This address is not currently in Minetrack’s tracked feed. Its live graph is not available.');
+    els.range.textContent = points.length ? (historyMode === 'year' ? `YEARLY · ${yearSelect.value} · DAILY SAMPLES` : 'MINETRACK · 24 HOURS · 1-MIN SAMPLES') : (historyMode === 'year' ? 'NO YEARLY HISTORY' : 'NO UPSTREAM HISTORY');
+    if (historyMode === 'year') {
+      els.summary.textContent = points.length ? `${points.length} daily snapshots · peak ${maxPlayers.toLocaleString()} players · latest ${available.at(-1)?.players.toLocaleString() ?? 'offline'}` : 'Yearly snapshots become available after the MineBeacon collector is configured.';
+      els.chart.setAttribute('aria-label', `Daily player count during ${yearSelect.value}`);
+    } else {
+      els.summary.textContent = samples.length ? `${samples.length.toLocaleString()} Minetrack samples · peak ${maxPlayers.toLocaleString()} players · latest ${available.at(-1)?.players.toLocaleString() ?? 'offline'}` : (feedIndex >= 0 ? 'Waiting for Minetrack to send daily history…' : 'This address is not currently in Minetrack’s tracked feed. Its live graph is not available.');
+      els.chart.setAttribute('aria-label', 'Player count over the last 24 hours');
+    }
+    const axis = els.chart.closest('.profile-chart-card').querySelectorAll('.chart-axis span');
+    if (axis.length) { axis[0].textContent = historyMode === 'year' ? `JAN ${yearSelect.value}` : '24 hours ago'; axis[1].textContent = historyMode === 'year' ? `DEC ${yearSelect.value}` : 'Now'; }
   };
   let hoverBound = false;
   const bindHover = () => {
     if (hoverBound) return;
     hoverBound = true;
     els.chart.addEventListener('pointermove', event => {
-      if (!samples.length) return;
+      const points = historyMode === 'year' ? yearlySamples : samples;
+      if (!points.length) return;
       const rect = els.chart.getBoundingClientRect();
       const fraction = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-      const index = Math.round(fraction * (samples.length - 1));
-      const point = samples[index];
+      const index = Math.round(fraction * (points.length - 1));
+      const point = points[index];
       if (!point) return;
       els.tooltip.textContent = `${new Date(point.at).toLocaleString()} · ${point.online ? `${point.players.toLocaleString()} players` : `Offline${point.error ? ` · ${point.error}` : ''}`}`;
       els.tooltip.hidden = false;
@@ -179,6 +203,36 @@
     catch { event.currentTarget.textContent = address; }
   });
   bindHover();
+  q('#history-24h').addEventListener('click', () => {
+    historyMode = '24h';
+    yearNote.hidden = true;
+    q('#history-24h').setAttribute('aria-pressed', 'true');
+    draw();
+  });
+  q('#history-load').addEventListener('click', async () => {
+    historyMode = 'year';
+    q('#history-24h').setAttribute('aria-pressed', 'false');
+    yearNote.hidden = false;
+    const base = String(window.MINEBEACON_API_BASE || '').replace(/\/$/, '');
+    if (!base) {
+      yearlySamples = [];
+      yearNote.textContent = 'Yearly snapshots require the shared MineBeacon API to be deployed and connected. Collection starts after setup, so older data cannot be backfilled.';
+      draw();
+      return;
+    }
+    yearNote.textContent = 'Loading daily snapshots…';
+    try {
+      const response = await fetch(`${base}/api/history?address=${encodeURIComponent(address)}&year=${encodeURIComponent(yearSelect.value)}`, { signal: AbortSignal.timeout(12000) });
+      if (!response.ok) throw new Error(`History service returned HTTP ${response.status}`);
+      const data = await response.json();
+      yearlySamples = (data.samples || []).map(item => ({ at: new Date(`${item.day}T12:00:00Z`).getTime(), online: Boolean(item.online) && item.players !== null && Number.isFinite(Number(item.players)), players: item.players === null ? null : Number(item.players), error: item.online ? '' : 'Offline' }));
+      yearNote.textContent = yearlySamples.length ? `${yearlySamples.length} daily snapshots for ${yearSelect.value}. Collection begins after backend setup; no earlier data is available.` : `No saved snapshots for ${yearSelect.value}. Daily collection begins after backend setup.`;
+    } catch (error) {
+      yearlySamples = [];
+      yearNote.textContent = `Yearly history unavailable: ${error.message || 'network error'}`;
+    }
+    draw();
+  });
   loadApi();
   connect();
 })();
