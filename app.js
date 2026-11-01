@@ -14,6 +14,7 @@ const API = 'https://api.mcsrvstat.us/3/';
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const grid = $('#server-grid');
+const normalizeAddress = address => String(address || '').trim().toLowerCase().replace(/\.$/, '').replace(/:(25565|19132)$/, '');
 
 function makeCard(server, index) {
   const card = document.createElement('article');
@@ -53,9 +54,10 @@ function makeCard(server, index) {
 let watchCards = [];
 const cardsByAddress = new Map();
 function addServerCard(server) {
-  const key = server.address.toLowerCase();
+  const key = normalizeAddress(server.address);
   if (cardsByAddress.has(key)) return cardsByAddress.get(key);
   const card = makeCard(server, watchCards.length);
+  if (server.featured) card.dataset.featured = 'true';
   grid.append(card);
   watchCards.push(card);
   cardsByAddress.set(key, card);
@@ -63,14 +65,14 @@ function addServerCard(server) {
   $('#directory-count').textContent = String(watchCards.length).padStart(2, '0');
   return card;
 }
-SERVERS.forEach(addServerCard);
+SERVERS.forEach(server => addServerCard({ ...server, featured: true }));
 const FAVORITES_KEY = 'minebeacon:favorites:v1';
 let favorites = new Set();
-try { favorites = new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')); } catch { /* Favorites remain usable for this session. */ }
+try { favorites = new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]').map(normalizeAddress)); } catch { /* Favorites remain usable for this session. */ }
 let favoritesOnly = false;
 
 function toggleFavorite(card) {
-  const address = card.dataset.address;
+  const address = normalizeAddress(card.dataset.address);
   if (favorites.has(address)) favorites.delete(address);
   else favorites.add(address);
   try { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favorites])); } catch { /* Storage may be unavailable. */ }
@@ -86,14 +88,76 @@ function arrangeServers() {
   const sort = $('#server-sort').value;
   const cards = [...watchCards];
   cards.forEach(card => {
-    const searchText = `${card.querySelector('.realm-title').textContent} ${card.querySelector('.realm-type').textContent}`.toLocaleLowerCase();
-    card.hidden = Boolean(query && !searchText.includes(query)) || (favoritesOnly && !favorites.has(card.dataset.address));
+    const searchText = `${card.querySelector('.realm-title').textContent} ${card.querySelector('.realm-type').textContent} ${card.dataset.search || ''}`.toLocaleLowerCase();
+    card.hidden = Boolean(query && !searchText.includes(query)) || (favoritesOnly && !favorites.has(normalizeAddress(card.dataset.address)));
   });
   if (sort === 'players') cards.sort((a, b) => Number(b.dataset.players ?? -1) - Number(a.dataset.players ?? -1));
   if (sort === 'name') cards.sort((a, b) => a.querySelector('.realm-title strong').textContent.localeCompare(b.querySelector('.realm-title strong').textContent));
   if (sort === 'status') cards.sort((a, b) => Number(b.dataset.online === 'true') - Number(a.dataset.online === 'true'));
   cards.forEach(card => grid.append(card));
 }
+
+function applyCatalogListing(card, server) {
+  card.dataset.catalogSource = 'msid';
+  card.dataset.catalogSlug = server.slug || '';
+  card.dataset.catalogOnline = String(server.status === 'ONLINE');
+  const count = server.currentPlayers;
+  const hasCount = count !== null && count !== undefined && Number.isFinite(Number(count));
+  card.dataset.catalogPlayers = hasCount ? String(Number(count)) : '';
+  card.dataset.catalogDescription = server.description || '';
+  card.dataset.search = [server.description, server.version, ...(server.tags || []), server.edition, server.owner?.username].filter(Boolean).join(' ');
+  if (card.dataset.featured !== 'true' && card.dataset.minetrackLive !== 'true') {
+    card.querySelector('.realm-title strong').textContent = server.name || server.address;
+    card.querySelector('.realm-type').textContent = `${server.edition === 'BEDROCK' ? 'BEDROCK' : server.edition === 'CROSS_PLAY' ? 'JAVA + BEDROCK' : 'JAVA'}${server.tags?.length ? ` · ${server.tags[0]}` : ''}`;
+  }
+  const live = card.dataset.minetrackLive === 'true';
+  const online = live ? card.dataset.minetrackOnline === 'true' : server.status === 'ONLINE';
+  const players = live ? (online ? Number(card.dataset.minetrackPlayers) : null) : (online && hasCount ? Number(count) : null);
+  const max = Number(server.maxPlayers || card.dataset.maxPlayers || 0);
+  if (max > 0) card.dataset.maxPlayers = String(max);
+  card.dataset.online = String(online);
+  card.dataset.players = online ? String(players ?? 0) : '-1';
+  const badge = $('.status-badge', card);
+  badge.className = `status-badge ${online ? 'online' : 'offline'}`;
+  badge.innerHTML = `<i></i>${online ? 'ONLINE' : 'OFFLINE'}`;
+  $('.players', card).textContent = players === null ? '—' : players.toLocaleString();
+  $('.bar-players small', card).textContent = live ? 'LIVE COUNT' : 'INDEX SAMPLE';
+  $('.capacity', card).textContent = online ? `${players === null ? 'Count unavailable' : `${players.toLocaleString()} online`} / ${max ? `${max.toLocaleString()} max` : 'capacity unknown'}` : 'Directory reports this server offline';
+  $('.meter-track i', card).style.width = online && max && players !== null ? `${Math.max(0, Math.min(100, players / max * 100))}%` : '0%';
+  $('.version', card).textContent = server.version || 'Not reported';
+  $('.software', card).textContent = server.edition?.replace('_', ' ') || 'Community listing';
+  $('.latency', card).textContent = live ? 'Minetrack live' : 'Public listing';
+  $('.host-info', card).textContent = `${server.address}${server.port && Number(server.port) !== 25565 ? `:${server.port}` : ''}`;
+  const description = flatten(server.description || server.tags?.join(' · ') || 'No community description provided.');
+  if (description) $('.motd', card).textContent = description.slice(0, 400);
+  const icon = $('.server-image', card);
+  if (server.iconUrl) { icon.onerror = () => { icon.hidden = true; $('.realm-emblem b', card).hidden = false; }; icon.src = server.iconUrl; icon.hidden = false; $('.realm-emblem b', card).hidden = true; }
+  const errorBox = $('.server-error', card);
+  if (!online) {
+    const message = $('.error-message', card);
+    if (!message.textContent.startsWith('Minetrack live probe:')) {
+      message.textContent = 'The public directory currently reports this server offline. Open its profile for an independent status check and any available probe diagnostics.';
+      errorBox.hidden = false;
+    }
+  } else if (!$('.error-message', card).textContent.startsWith('Minetrack live probe:')) errorBox.hidden = true;
+  $('.realm-bar', card).setAttribute('aria-label', `${card.querySelector('.realm-title strong').textContent}: ${online ? 'online' : 'offline'}, ${players ?? 'unknown'} players`);
+}
+
+function applyCatalog(state) {
+  if (!state) return;
+  for (const server of state.servers || []) {
+    if (!server.address) continue;
+    const address = server.port && Number(server.port) !== (server.edition === 'BEDROCK' ? 19132 : 25565) ? `${server.address}:${server.port}` : server.address;
+    const mode = server.edition === 'BEDROCK' ? 'Bedrock' : (server.edition === 'CROSS_PLAY' ? 'Cross-play' : 'Java');
+    const serverCard = addServerCard({ name: server.name || address, address, mode: `${mode}${server.tags?.length ? ` · ${server.tags[0]}` : ''}`, color: 'cyan' });
+    applyCatalogListing(serverCard, server);
+  }
+  $('#catalog-count').textContent = String(state.total || state.servers?.length || 0);
+  $('#catalog-status').textContent = state.error ? `Community list temporarily unavailable · ${state.stale ? 'showing saved results' : 'Minetrack feed still works'}` : state.loading ? 'Refreshing community listings…' : `${state.stale ? 'Saved' : 'Updated'} community listings · ${new Date(state.fetchedAt || Date.now()).toLocaleTimeString()} · provider checks about every 5 minutes`;
+  arrangeServers();
+}
+window.addEventListener('minebeacon:catalog', event => applyCatalog(event.detail));
+if (window.MineBeaconCatalog) applyCatalog(window.MineBeaconCatalog.state);
 
 $('#server-filter').addEventListener('input', arrangeServers);
 $('#server-sort').addEventListener('change', arrangeServers);
@@ -105,7 +169,7 @@ $('#favorites-filter').addEventListener('click', event => {
 });
 watchCards.forEach(card => {
   const button = $('.favorite-toggle', card);
-  const active = favorites.has(card.dataset.address);
+  const active = favorites.has(normalizeAddress(card.dataset.address));
   button.setAttribute('aria-pressed', String(active));
   button.textContent = active ? '★ Saved to favorites' : '☆ Add to favorites';
 });
@@ -218,9 +282,12 @@ function apiErrorMessage(data) {
 function updateCard(card, data, elapsed, requestError = '') {
   const apiOnline = Boolean(data.online);
   const liveCount = card.dataset.minetrackLive === 'true';
-  const online = liveCount ? card.dataset.minetrackOnline === 'true' : apiOnline;
+  const indexed = card.dataset.catalogSource === 'msid';
+  const indexedOnline = card.dataset.catalogOnline === 'true';
+  const online = liveCount ? card.dataset.minetrackOnline === 'true' : (indexed ? indexedOnline : apiOnline);
   card.dataset.online = String(online);
-  const onlineCount = liveCount ? (online ? Number(card.dataset.minetrackPlayers) : null) : (online ? Number(data.players?.online || 0) : null);
+  const indexedCount = card.dataset.catalogPlayers === '' ? null : Number(card.dataset.catalogPlayers);
+  const onlineCount = liveCount ? (online ? Number(card.dataset.minetrackPlayers) : null) : (indexed ? (online ? indexedCount : null) : (online ? Number(data.players?.online || 0) : null));
   const maxCount = apiOnline ? Number(data.players?.max || 0) : Number(card.dataset.maxPlayers || 0);
   if (apiOnline && maxCount > 0) card.dataset.maxPlayers = String(maxCount);
   card.dataset.players = online ? String(onlineCount ?? 0) : '-1';
@@ -235,12 +302,13 @@ function updateCard(card, data, elapsed, requestError = '') {
   $('.software', card).textContent = data.software || data.software_name || 'Not reported';
   $('.latency', card).textContent = apiOnline ? `${elapsed} ms` : (requestError ? 'API unavailable' : 'No response');
   $('.host-info', card).textContent = [data.hostname || data.ip || '—', data.port || ''].filter(Boolean).join(':');
-  const motd = flatten(data.motd?.clean || data.motd?.raw || data.motd?.html) || (!apiOnline && liveCount && online ? 'Minetrack sees players online, but the detail API returned no MOTD.' : (apiOnline ? 'This server did not provide a message.' : 'No MOTD was returned with the offline status.'));
+  const motd = flatten(data.motd?.clean || data.motd?.raw || data.motd?.html) || (indexed && card.dataset.catalogDescription ? card.dataset.catalogDescription : (!apiOnline && liveCount && online ? 'Minetrack sees players online, but the detail API returned no MOTD.' : (apiOnline ? 'This server did not provide a message.' : 'No MOTD was returned with the offline status.')));
   $('.motd', card).textContent = motd.slice(0, 400);
   const sample = Array.isArray(data.players?.list) ? data.players.list.slice(0, 12).map(item => typeof item === 'string' ? item : item.name).filter(Boolean) : [];
   $('.sample-players', card).textContent = sample.length ? sample.join(' · ') : (online ? 'Server did not expose a public player sample.' : 'No player list is available while offline.');
-  const mismatch = liveCount && apiOnline !== online;
-  const error = requestError || apiErrorMessage(data) || (mismatch ? `Status sources disagree: Minetrack reports ${online ? 'online' : 'offline'}, while the detail API reports ${apiOnline ? 'online' : 'offline'}.` : (!apiOnline ? (online ? 'Minetrack live data currently sees players online, but the detail API did not respond.' : 'The status API reports this server as offline but supplied no more specific error. The outage could be on the server, network, or status-service side.') : ''));
+  const mismatch = (liveCount && apiOnline !== online) || (indexed && apiOnline !== indexedOnline);
+  const primarySource = liveCount ? 'Minetrack' : 'minecraftserver.id';
+  const error = requestError || apiErrorMessage(data) || (mismatch ? `Status sources disagree: ${primarySource} reports ${online ? 'online' : 'offline'}, while MCSRVStat reports ${apiOnline ? 'online' : 'offline'}.` : (!apiOnline ? (online ? `${primarySource} reports this server online, but MCSRVStat returned no online response.` : 'The status API reports this server as offline but supplied no more specific error. The outage could be on the server, network, or status-service side.') : ''));
   const errorBox = $('.server-error', card);
   errorBox.hidden = !error;
   $('.error-message', card).textContent = error;
@@ -287,6 +355,7 @@ function applyMinetrackCount(card, playerCount, timestamp, error = '') {
 }
 
 async function refreshCard(card) {
+  if (card.dataset.catalogSource === 'msid') return;
   const badge = $('.status-badge', card);
   if (card.dataset.minetrackLive !== 'true') {
     badge.className = 'status-badge loading';
@@ -309,8 +378,10 @@ refreshCard(watchCards[0]).finally(() => {
 });
 setInterval(async () => {
   if (document.hidden || rotationBusy || watchCards.length === 0) return;
+  const refreshable = watchCards.filter(card => card.dataset.catalogSource !== 'msid');
+  if (!refreshable.length) return;
   rotationBusy = true;
-  await refreshCard(watchCards[rotationIndex % watchCards.length]);
+  await refreshCard(refreshable[rotationIndex % refreshable.length]);
   rotationIndex += 1;
   rotationBusy = false;
 }, 1000);
@@ -318,14 +389,15 @@ $('#refresh-all').addEventListener('click', async () => {
   if (rotationBusy) return;
   rotationBusy = true;
   const button = $('#refresh-all');
-  const cards = [...watchCards];
+  const cards = watchCards.filter(card => card.dataset.catalogSource !== 'msid');
   try {
+    await window.MineBeaconCatalog?.refresh(true);
     for (let index = 0; index < cards.length; index++) {
       button.innerHTML = `<span>↻</span> ${index + 1}/${cards.length}`;
       await refreshCard(cards[index]);
       if (index < cards.length - 1) await new Promise(resolve => setTimeout(resolve, 1000));
     }
-    rotationIndex = (rotationIndex + 1) % Math.max(watchCards.length, 1);
+    rotationIndex = (rotationIndex + 1) % Math.max(cards.length, 1);
   } finally {
     button.innerHTML = '<span>↻</span> Refresh list';
     rotationBusy = false;

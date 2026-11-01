@@ -1,21 +1,21 @@
 # MineBeacon
 
-A Minecraft server discovery site with live player counts, server status details, 24-hour player history, favorites, and a real-time leaderboard. The home page is an introduction, with dedicated Servers, Leaderboard, About, and individual server profile pages. The site is dark by default and follows the visitor's system color preference.
+A Minecraft server discovery site with live player counts, server status details, 24-hour player history, favorites, and a real-time leaderboard. The home page is an introduction, with dedicated Servers, Player Stats, About, and individual server profile pages. The site is dark by default and follows the visitor's system color preference.
 
 ## Pages
 
 - `index.html` introduces MineBeacon and shows a small live network summary.
 - `servers.html` contains the searchable directory, favorites, address checker, live counts, expandable details, and 24-hour graph cards.
-- `leaderboard.html` ranks Minetrack-tracked servers by current players and reports their 24-hour peak.
+- `leaderboard.html` is the Player Stats browser. It combines Minetrack's fast live feed with the broader MinecraftServer.ID community directory, showing searchable, filterable multiplayer-style rows with player counts, edition, version, mode tags, uptime, and community vote metrics.
 - `server.html?address=mc.example.net` shows an individual server profile, diagnostics, MOTD, metadata, live status, and hoverable daily history. Profiles work for any address checked by MCSRVStat, while Minetrack live counts and history are available for servers in its feed.
 - `about.html` documents data sources, limitations, and privacy.
 - `404.html` provides a themed not-found page. `sitemap.xml` and `robots.txt` describe the public pages to crawlers.
 
 ## Data sources
 
-Minetrack's public WebSocket at `wss://minetrack.me` provides tracked server discovery, live player counts, probe errors, and the 24-hour graph. The graph request returns a sample series for the past day, and the client adds new live points when Minetrack publishes them. The interactive graph tooltip shows the exact timestamp and player count at the selected point. MCSRVStat at `https://api.mcsrvstat.us/3/` supplies extra server details, including version, software, latency, MOTD, capacity, icons, and diagnostics where available. Both sources are independent and can disagree. The interface surfaces those differences instead of claiming certainty. No API credentials or backend are required.
+Minetrack's public WebSocket at `wss://minetrack.me` provides tracked server discovery, live player counts, probe errors, and the 24-hour graph. MinecraftServer.ID's public API expands the directory with its community listings, current/max player snapshots, edition, version, tags, uptime and vote metrics. Its directory focuses on Indonesian servers, allows unauthenticated public requests, and applies rate limits. Directory counts are provider snapshots that may refresh around every five minutes, not second-by-second pings. The browser refreshes its catalog every minute and caches it locally. MCSRVStat at `https://api.mcsrvstat.us/3/` supplies extra on-demand server details. Sources are independent and can disagree. No API credentials or backend are required.
 
-The directory seeds ten featured communities and adds Minetrack's configured servers dynamically. Duplicates are collapsed by address. Favorites and a small fallback history are kept in browser local storage. Server detail checks rotate in the background to avoid firing every request simultaneously.
+The directory seeds ten featured communities and merges Minetrack's configured servers with MinecraftServer.ID's public directory; duplicate hostnames are collapsed. Minetrack counts refresh as the WebSocket publishes updates. Favorites and a small fallback history are kept in browser local storage.
 
 ## Run locally
 
