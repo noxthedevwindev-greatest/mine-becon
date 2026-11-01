@@ -3,54 +3,57 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101510">
-  <meta name="description" content="Live Minecraft server status, player counts, latency and Java/Bedrock support.">
-  <title>MineBeacon — Minecraft server pulse</title>
+  <meta name="theme-color" content="#153b35">
+  <meta name="description" content="MineBeacon checks Minecraft server status, player counts and versions in a block-built world.">
+  <title>MineBeacon | Find your next world</title>
   <link rel="preconnect" href="https://api.mcsrvstat.us">
-  <link rel="preconnect" href="https://api.mcstatus.io">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="shell">
+  <div class="page-shell">
     <header class="topbar">
-      <a class="brand" href="#" aria-label="MineBeacon home"><span class="brand-mark">▦</span> minebeacon<span class="brand-dot">.</span></a>
-      <nav><a class="nav-active" href="#dashboard">Dashboard</a><a href="#how">How it works</a></nav>
-      <div class="live-pill"><i></i> <span id="live-label">LIVE · 1S ROTATION</span></div>
+      <a class="brand" href="#top" aria-label="MineBeacon home"><span class="brand-cube"><i></i></span><span>MINE<span>BEACON</span></span></a>
+      <nav><a class="active" href="#servers">Server browser</a><a href="#how">How it works</a></nav>
+      <div class="header-status"><span class="pulse-dot"></span> THE REALM IS ONLINE</div>
     </header>
 
-    <main id="dashboard">
+    <main id="top">
       <section class="hero">
-        <div class="hero-copy">
-          <div class="eyebrow"><span class="eyebrow-line"></span> YOUR WORLD, AT A GLANCE</div>
-          <h1>Every server.<br><span>One beacon.</span></h1>
-          <p class="lede">Pixel-perfect pulse checks for your favorite Minecraft worlds. Watch player counts, version, and uptime with a fresh check every second.</p>
+        <div class="hero-text">
+          <div class="kicker"><span class="kicker-block"></span> YOUR NEXT ADVENTURE STARTS HERE</div>
+          <h1>Find your<br>next <em>world.</em></h1>
+          <p>Scout the realms. Check who's online. Find a place in the world that's just right for you.</p>
           <form id="lookup-form" class="search-box">
-            <span class="search-icon">⌕</span>
-            <input id="server-input" autocomplete="off" placeholder="Enter a server address…" aria-label="Minecraft server address" required>
-            <button type="submit">Check server <span>↗</span></button>
+            <span class="search-cube" aria-hidden="true">⌕</span>
+            <input id="server-input" autocomplete="off" placeholder="Server address or IP…" aria-label="Minecraft server address" required>
+            <button type="submit">SCAN WORLD <span>→</span></button>
           </form>
-          <div class="form-note"><span>↳</span> Java and Bedrock · hostname or IP</div>
+          <div class="search-hint"><span>JAVA + BEDROCK</span><b>·</b> Instant status scan, no account needed</div>
         </div>
-        <div class="hero-art" aria-hidden="true">
-          <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
-          <div class="pixel-world"><div class="cube cube-back"></div><div class="cube cube-front"></div><div class="cube cube-side"></div><div class="grass grass-one"></div><div class="grass grass-two"></div><div class="spark spark-one">✦</div><div class="spark spark-two">✧</div><div class="pixel-moon"></div></div>
-          <div class="art-caption"><span class="pulse-dot"></span> THE OVERWORLD IS CALLING</div>
+        <div class="scene" aria-hidden="true">
+          <div class="scene-sun"></div><div class="scene-cloud cloud-a"></div><div class="scene-cloud cloud-b"></div>
+          <div class="mountain mountain-back"></div><div class="mountain mountain-front"></div>
+          <div class="block-hill hill-left"></div><div class="block-hill hill-right"></div>
+          <div class="hero-tree tree-left"><i></i><b></b></div><div class="hero-tree tree-right"><i></i><b></b></div>
+          <div class="hero-beacon"><div class="beacon-ray"></div><div class="beacon-cap"></div><div class="beacon-top"></div><div class="beacon-body"><i></i><i></i><i></i></div><div class="beacon-base"></div></div>
+          <div class="scene-ground"></div><div class="scene-label"><span class="pulse-dot"></span> SCANNING THE OVERWORLD</div>
+          <span class="scene-coord">X: 248 · Z: -103</span>
         </div>
       </section>
 
-      <section class="dashboard-section">
-        <div class="section-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> QUICK ACCESS</div><h2>Your watchlist<span class="muted-count" id="watch-count">03</span></h2><div class="refresh-meta"><span class="pulse-dot"></span> Rotating live checks · one server per second</div></div><button id="refresh-all" class="refresh-button"><span>↻</span> Refresh all</button></div>
+      <section id="servers" class="server-section">
+        <div class="section-title-row"><div><div class="kicker"><span class="kicker-block"></span> LIVE SERVER SCOUT</div><h2>Popular realms <span class="realm-count">03</span></h2><p class="section-subtitle">A few good places to start your journey.</p></div><button id="refresh-all" class="refresh-button"><span>↻</span> Rescan realms</button></div>
+        <div class="refresh-meta"><span class="pulse-dot"></span> One status check each second · rotates through the list</div>
         <div id="server-grid" class="server-grid" aria-live="polite">
-          <article class="server-card" data-address="mc.hypixel.net"><div class="card-top"><div class="server-icon icon-gold">H</div><span class="status-badge loading"><i></i> Checking</span></div><div class="server-name">Hypixel</div><div class="server-address">mc.hypixel.net <button class="copy" title="Copy address" aria-label="Copy mc.hypixel.net">▢</button></div><div class="player-row"><div><strong class="players">—</strong><span class="player-label">PLAYERS ONLINE</span></div><div class="sparkline" aria-hidden="true"><svg viewBox="0 0 100 28"><path d="M0 22 L12 17 L22 19 L33 11 L43 14 L55 7 L66 12 L77 5 L88 8 L100 2"/></svg></div></div><div class="card-foot"><span class="edition">JAVA EDITION</span><span class="latency">— ms</span></div></article>
-          <article class="server-card" data-address="play.cubecraft.net"><div class="card-top"><div class="server-icon icon-blue">C</div><span class="status-badge loading"><i></i> Checking</span></div><div class="server-name">CubeCraft</div><div class="server-address">play.cubecraft.net <button class="copy" title="Copy address" aria-label="Copy play.cubecraft.net">▢</button></div><div class="player-row"><div><strong class="players">—</strong><span class="player-label">PLAYERS ONLINE</span></div><div class="sparkline blue" aria-hidden="true"><svg viewBox="0 0 100 28"><path d="M0 20 L12 17 L22 21 L33 12 L43 16 L55 9 L66 13 L77 6 L88 10 L100 3"/></svg></div></div><div class="card-foot"><span class="edition">JAVA EDITION</span><span class="latency">— ms</span></div></article>
-          <article class="server-card" data-address="play.pika-network.net"><div class="card-top"><div class="server-icon icon-purple">P</div><span class="status-badge loading"><i></i> Checking</span></div><div class="server-name">PikaNetwork</div><div class="server-address">play.pika-network.net <button class="copy" title="Copy address" aria-label="Copy play.pika-network.net">▢</button></div><div class="player-row"><div><strong class="players">—</strong><span class="player-label">PLAYERS ONLINE</span></div><div class="sparkline purple" aria-hidden="true"><svg viewBox="0 0 100 28"><path d="M0 23 L12 18 L22 20 L33 14 L43 17 L55 8 L66 14 L77 7 L88 9 L100 2"/></svg></div></div><div class="card-foot"><span class="edition">JAVA EDITION</span><span class="latency">— ms</span></div></article>
+          <article class="server-card meadow" data-address="mc.hypixel.net"><div class="card-landscape"><span class="land-label">ADVENTURE</span><div class="mini-cloud"></div><div class="mini-hill"></div><div class="mini-tree"><i></i><b></b></div><div class="mini-ground"></div><div class="server-icon icon-gold">H</div></div><div class="card-content"><div class="card-heading"><div><h3>Hypixel</h3><div class="server-address">mc.hypixel.net <button class="copy" title="Copy address" aria-label="Copy mc.hypixel.net">▢</button></div></div><span class="status-badge loading"><i></i> Checking</span></div><div class="player-strip"><div><strong class="players">—</strong><span class="player-label">PLAYERS ONLINE</span></div><div class="sparkline" aria-hidden="true"><svg viewBox="0 0 100 28"><path d="M0 22 L12 17 L22 19 L33 11 L43 14 L55 7 L66 12 L77 5 L88 8 L100 2"/></svg></div></div><div class="card-footer"><span class="edition">JAVA EDITION</span><span class="latency">— ms</span></div></div></article>
+          <article class="server-card coast" data-address="play.cubecraft.net"><div class="card-landscape"><span class="land-label">MINIGAMES</span><div class="mini-cloud"></div><div class="mini-hill"></div><div class="mini-tree"><i></i><b></b></div><div class="mini-ground"></div><div class="server-icon icon-blue">C</div></div><div class="card-content"><div class="card-heading"><div><h3>CubeCraft</h3><div class="server-address">play.cubecraft.net <button class="copy" title="Copy address" aria-label="Copy play.cubecraft.net">▢</button></div></div><span class="status-badge loading"><i></i> Checking</span></div><div class="player-strip"><div><strong class="players">—</strong><span class="player-label">PLAYERS ONLINE</span></div><div class="sparkline blue" aria-hidden="true"><svg viewBox="0 0 100 28"><path d="M0 20 L12 17 L22 21 L33 12 L43 16 L55 9 L66 13 L77 6 L88 10 L100 3"/></svg></div></div><div class="card-footer"><span class="edition">JAVA EDITION</span><span class="latency">— ms</span></div></div></article>
+          <article class="server-card dusk" data-address="play.pika-network.net"><div class="card-landscape"><span class="land-label">SURVIVAL</span><div class="mini-cloud"></div><div class="mini-hill"></div><div class="mini-tree"><i></i><b></b></div><div class="mini-ground"></div><div class="server-icon icon-purple">P</div></div><div class="card-content"><div class="card-heading"><div><h3>PikaNetwork</h3><div class="server-address">play.pika-network.net <button class="copy" title="Copy address" aria-label="Copy play.pika-network.net">▢</button></div></div><span class="status-badge loading"><i></i> Checking</span></div><div class="player-strip"><div><strong class="players">—</strong><span class="player-label">PLAYERS ONLINE</span></div><div class="sparkline purple" aria-hidden="true"><svg viewBox="0 0 100 28"><path d="M0 23 L12 18 L22 20 L33 14 L43 17 L55 8 L66 14 L77 7 L88 9 L100 2"/></svg></div></div><div class="card-footer"><span class="edition">JAVA EDITION</span><span class="latency">— ms</span></div></div></article>
         </div>
         <div id="lookup-result" class="lookup-result" hidden></div>
       </section>
-
-      <section id="how" class="bottom-note"><div class="note-icon">✳</div><div><strong>Fresh signal, every time.</strong><p>Watchlist status rotates through the free public API once per second. Provider caching and response times can affect how fresh each server reading is.</p></div><div class="api-tag">STATUS CHECKS VIA <b>MCSRVSTAT.US</b></div></section>
+      <section id="how" class="how-strip"><div class="how-emblem">✦</div><div><strong>Every world has a story.</strong><p>MineBeacon checks public Minecraft status data. Results can be affected by server reachability, API caching, or service availability.</p></div><div class="api-credit">STATUS DATA <b>·</b> MCSRVSTAT.US</div></section>
     </main>
-    <footer><span>© 2026 MINEBEACON</span><span>Made for the love of the game <b>♥</b></span><span>Not affiliated with Mojang or Microsoft</span></footer>
+    <footer><a class="footer-brand" href="#top">MINEBEACON <span>◆</span></a><span>Built for explorers, builders & block-breakers.</span><span>Not affiliated with Mojang or Microsoft.</span></footer>
   </div>
   <script src="app.js" defer></script>
 </body>
