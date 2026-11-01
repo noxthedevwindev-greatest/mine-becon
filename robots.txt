@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://noxthedevwindev-greatest.github.io/blockwatch-minecraft/sitemap.xml

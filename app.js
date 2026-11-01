@@ -26,9 +26,10 @@ function makeCard(server, index) {
     <span class="status-badge loading"><i></i> Checking</span><span class="expand-icon">＋</span></button>
     <div class="realm-details" id="realm-details-${index}" hidden>
       <div class="player-meter"><div class="meter-label"><span>PLAYER CAPACITY</span><strong class="capacity">Waiting for status</strong></div><div class="meter-track"><i></i></div></div>
-      <div class="history-panel"><div class="history-heading"><div><small>OBSERVED PLAYER HISTORY</small><strong class="history-summary">Collecting real samples…</strong></div><span class="history-range">LAST 60 CHECKS</span></div><svg class="player-chart" viewBox="0 0 600 120" role="img" aria-label="Observed player-count history graph"><path class="chart-gridline" d="M0 20H600M0 60H600M0 100H600"/><polyline class="chart-line" points=""/></svg><div class="uptime-heading"><small>RECENT STATUS CHECKS</small><span class="uptime-value">Gathering samples</span></div><div class="uptime-strip" aria-label="Recent observed online and offline checks"></div></div>
+      <div class="history-panel"><div class="history-heading"><div><small>PLAYER HISTORY</small><strong class="history-summary">Loading Minetrack's 24-hour graph…</strong></div><span class="history-range">24 HOURS · 1-MIN SAMPLES</span></div><div class="chart-wrap"><svg class="player-chart" viewBox="0 0 600 120" preserveAspectRatio="none" role="img" aria-label="Player count over the last 24 hours"><path class="chart-gridline" d="M0 20H600M0 60H600M0 100H600"/><circle class="chart-hover-dot" cx="0" cy="0" r="5" hidden></circle></svg><div class="chart-tooltip" role="status" hidden></div></div><div class="chart-axis"><span>24 hours ago</span><span>Now</span></div><div class="chart-hint">Hover or tap the graph for the exact player count and time.</div><div class="uptime-heading"><small>24-HOUR OBSERVED STATUS</small><span class="uptime-value">Loading</span></div><div class="uptime-strip" aria-label="Recent observed online and offline checks"></div></div>
       <div class="detail-grid"><div><small>GAME VERSION</small><strong class="version">Unknown</strong></div><div><small>SOFTWARE</small><strong class="software">Unknown</strong></div><div><small>RESPONSE</small><strong class="latency">—</strong></div><div><small>PORT / HOST</small><strong class="host-info">—</strong></div></div>
       <div class="motd-box"><small>SERVER MESSAGE / MOTD</small><p class="motd">Waiting for server response…</p></div>
+      <a class="server-page-link" href="server.html?address=${encodeURIComponent(server.address)}">OPEN FULL SERVER PAGE <span>↗</span></a>
       <div class="server-error" hidden><small>SERVER / API DIAGNOSTIC</small><p class="error-message"></p></div>
       <div class="favorite-row"><button class="favorite-toggle" type="button" aria-pressed="false">☆ Add to favorites</button><span class="favorite-note">Saved on this device</span></div>
       <div class="sample-row"><div><small>PLAYERS ONLINE</small><div class="sample-players">Player list is not public.</div></div><button class="copy" type="button" title="Copy server address">COPY ADDRESS</button></div>
@@ -39,6 +40,7 @@ function makeCard(server, index) {
     button.setAttribute('aria-expanded', String(!open));
     $(`#realm-details-${index}`).hidden = open;
     $('.expand-icon', button).textContent = open ? '＋' : '−';
+    if (!open) renderHistory(card);
   });
   $('.copy', card).addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(server.address); $('.copy', card).textContent = 'COPIED'; setTimeout(() => { $('.copy', card).textContent = 'COPY ADDRESS'; }, 1200); }
@@ -58,6 +60,7 @@ function addServerCard(server) {
   watchCards.push(card);
   cardsByAddress.set(key, card);
   $('#watch-count').textContent = String(watchCards.length).padStart(2, '0');
+  $('#directory-count').textContent = String(watchCards.length).padStart(2, '0');
   return card;
 }
 SERVERS.forEach(addServerCard);
@@ -132,6 +135,7 @@ function readHistory() {
   } catch { return {}; }
 }
 const observations = readHistory();
+const dayHistory = new Map();
 
 function recordObservation(address, data, errorMessage = '', at = Date.now(), source = 'Direct status check') {
   const list = observations[address] || (observations[address] = []);
@@ -141,34 +145,69 @@ function recordObservation(address, data, errorMessage = '', at = Date.now(), so
 }
 
 function renderHistory(card) {
-  const list = observations[card.dataset.address] || [];
+  if ($('.realm-details', card).hidden) return;
+  const hasDayHistory = dayHistory.has(card.dataset.address);
+  const list = hasDayHistory ? dayHistory.get(card.dataset.address) : (observations[card.dataset.address] || []);
   const values = list.filter(sample => sample.online && Number.isFinite(sample.players));
-  const line = $('.chart-line', card);
   const chart = $('.player-chart', card);
-  const circlesHost = chart;
-  chart.querySelectorAll('.sample-dot').forEach(dot => dot.remove());
+  const hoverDot = $('.chart-hover-dot', chart);
+  chart.querySelectorAll('.chart-segment').forEach(segment => segment.remove());
   const max = Math.max(1, ...values.map(sample => sample.players));
-  const coords = values.map(sample => ({ x: list.length < 2 ? 300 : list.indexOf(sample) * 600 / (list.length - 1), y: 100 - sample.players / max * 82, sample }));
-  line.setAttribute('points', coords.map(point => `${point.x},${point.y}`).join(' '));
-  coords.forEach(point => {
-    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    dot.setAttribute('class', 'sample-dot'); dot.setAttribute('cx', point.x); dot.setAttribute('cy', point.y); dot.setAttribute('r', '3.5');
-    dot.setAttribute('aria-label', `${point.sample.players} players at ${new Date(point.sample.at).toLocaleTimeString()}`);
-    circlesHost.append(dot);
+  let segment = [];
+  const drawSegment = () => {
+    if (!segment.length) return;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+    line.setAttribute('class', 'chart-line chart-segment');
+    line.setAttribute('points', segment.map(point => `${point.x},${point.y}`).join(' '));
+    chart.insertBefore(line, hoverDot);
+    segment = [];
+  };
+  list.forEach((sample, index) => {
+    if (!sample.online || !Number.isFinite(sample.players)) { drawSegment(); return; }
+    const x = list.length < 2 ? 300 : index * 600 / (list.length - 1);
+    segment.push({ x, y: 100 - sample.players / max * 82 });
   });
+  drawSegment();
   const latest = values.at(-1)?.players;
-  const trend = values.length ? `${values.length} real samples · now ${latest.toLocaleString()} · peak ${max.toLocaleString()}` : 'Collecting real samples…';
+  const trend = values.length ? `${hasDayHistory ? '24h graph' : 'Local samples'} · ${values.length} online points · latest ${latest.toLocaleString()} · peak ${max.toLocaleString()}` : 'Collecting real samples…';
   $('.history-summary', card).textContent = trend;
+  $('.history-range', card).textContent = hasDayHistory ? 'MINETRACK · 24 HOURS' : 'LOCAL RECENT HISTORY';
+  $('.chart-axis span:first-child', card).textContent = hasDayHistory ? '24 hours ago' : 'Oldest local check';
+  $('.uptime-heading small', card).textContent = hasDayHistory ? '24-HOUR OBSERVED STATUS' : 'RECENT OBSERVED STATUS';
+  if (!chart.dataset.hoverBound) {
+    chart.dataset.hoverBound = 'true';
+    const tooltip = $('.chart-tooltip', card);
+    chart.addEventListener('pointermove', event => {
+      const samples = dayHistory.get(card.dataset.address) || observations[card.dataset.address] || [];
+      if (!samples.length) return;
+      const rect = chart.getBoundingClientRect();
+      const fraction = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+      const index = Math.round(fraction * (samples.length - 1));
+      const sample = samples[index];
+      if (!sample) return;
+      const time = new Date(sample.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      tooltip.textContent = `${time} · ${sample.online ? `${sample.players.toLocaleString()} players` : 'No response'}${sample.source ? ` · ${sample.source}` : ''}`;
+      tooltip.hidden = false;
+      tooltip.style.left = `${Math.max(12, Math.min(88, fraction * 100))}%`;
+      const dotX = fraction * 600;
+      if (sample.online && Number.isFinite(sample.players)) {
+        hoverDot.setAttribute('cx', dotX);
+        hoverDot.setAttribute('cy', 100 - sample.players / Math.max(1, ...samples.filter(item => item.online).map(item => item.players)) * 82);
+        hoverDot.removeAttribute('hidden');
+      } else hoverDot.setAttribute('hidden', '');
+    });
+    chart.addEventListener('pointerleave', () => { tooltip.hidden = true; hoverDot.setAttribute('hidden', ''); });
+  }
   const strip = $('.uptime-strip', card);
   strip.replaceChildren();
-  list.forEach(sample => {
+  list.slice(-60).forEach(sample => {
     const tick = document.createElement('i');
     tick.className = sample.online ? 'check-online' : 'check-offline';
     tick.title = `${new Date(sample.at).toLocaleString()} · ${sample.source || 'Status check'} · ${sample.online ? `${sample.players ?? 0} players` : (sample.note || 'Offline')}`;
     strip.append(tick);
   });
   const onlineCount = list.filter(sample => sample.online).length;
-  $('.uptime-value', card).textContent = list.length ? `${Math.round(onlineCount / list.length * 100)}% observed online · ${list.length} checks` : 'Gathering samples';
+  $('.uptime-value', card).textContent = list.length ? `${Math.round(onlineCount / list.length * 100)}% observed online · ${list.length} samples` : 'Gathering samples';
 }
 
 function apiErrorMessage(data) {
@@ -304,6 +343,11 @@ $('#lookup-form').addEventListener('submit', async event => {
     const data = await checkServer(address);
     const count = data.online ? `${(data.players?.online ?? 0).toLocaleString()} / ${(data.players?.max ?? 0).toLocaleString()} players` : 'No response from this server';
     result.textContent = `${data.online ? 'ONLINE' : 'OFFLINE'} · ${address} · ${count} · ${Math.round(performance.now() - started)} ms · ${data.version || 'Version unknown'} · ${flatten(data.motd?.clean)}`;
+    const profileLink = document.createElement('a');
+    profileLink.className = 'server-page-link';
+    profileLink.href = `server.html?address=${encodeURIComponent(address)}`;
+    profileLink.textContent = 'OPEN FULL PROFILE ↗';
+    result.append(' ', profileLink);
   } catch { result.textContent = `Could not reach the status service for ${address}. Check the address or try again shortly.`; }
 });
 
@@ -314,7 +358,7 @@ function startMinetrackFeed() {
   const feedState = $('#feed-state');
   const setFeedState = text => {
     feedState.textContent = text;
-    $('.refresh-meta .pulse-dot').classList.toggle('disconnected', text.includes('disconnected'));
+    $('.mini-live .pulse-dot').classList.toggle('disconnected', text.toLowerCase().includes('disconnected'));
   };
   const connect = () => {
     setFeedState('Connecting to Minetrack live data…');
@@ -344,7 +388,22 @@ function startMinetrackFeed() {
           const card = feedServers[index];
           if (card) applyMinetrackCount(card, status.playerCount, initTimestamp, status.error?.message || '');
         });
+        if (payload.config?.isGraphVisible && socket.readyState === WebSocket.OPEN) socket.send('requestHistoryGraph');
         setFeedState(`Minetrack live · ${feedServers.length} tracked servers · updated just now`);
+        return;
+      }
+      if (payload.message === 'historyGraph') {
+        feedServers.forEach((card, index) => {
+          const counts = payload.graphData?.[index] || [];
+          const history = (payload.timestamps || []).map((timestamp, pointIndex) => {
+            const count = counts[pointIndex];
+            const online = count !== null && count !== undefined && Number.isFinite(Number(count));
+            return { at: Number(timestamp) * 1000, online, players: online ? Number(count) : null, note: online ? '' : 'No response', source: 'Minetrack 24-hour history' };
+          });
+          dayHistory.set(card.dataset.address, history);
+          renderHistory(card);
+        });
+        setFeedState(`Minetrack live · 24-hour graphs loaded · ${feedServers.length} servers`);
         return;
       }
       if (payload.message === 'updateServers') {
@@ -352,6 +411,19 @@ function startMinetrackFeed() {
           const card = feedServers[index];
           if (card) applyMinetrackCount(card, update.playerCount, payload.timestamp, update.error?.message || '');
         });
+        if (payload.updateHistoryGraph) {
+          feedServers.forEach((card, index) => {
+            const history = dayHistory.get(card.dataset.address);
+            const update = payload.updates?.[index];
+            if (!history || !update) return;
+            const count = update.playerCount;
+            const online = count !== null && count !== undefined && Number.isFinite(Number(count));
+            history.push({ at: Number(payload.timestamp) * 1000, online, players: online ? Number(count) : null, note: update.error?.message || '', source: 'Minetrack live history' });
+            const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+            dayHistory.set(card.dataset.address, history.filter(sample => sample.at > cutoff).slice(-1440));
+            renderHistory(card);
+          });
+        }
         const updatedAt = new Date(Number(payload.timestamp) * 1000);
         setFeedState(`Minetrack live · ${feedServers.length} tracked servers · updated ${updatedAt.toLocaleTimeString()}`);
       }
