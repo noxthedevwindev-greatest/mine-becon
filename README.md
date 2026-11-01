@@ -1,12 +1,10 @@
 # MineBeacon
 
-A responsive Minecraft server status scout featuring a ten-server rotating list, expandable status bars, a Java/Bedrock address search, client-side server filtering and sorting, per-device favorites, and a dark-first theme that follows the visitor's system color preference.
+A responsive Minecraft server status scout featuring the Minetrack live WebSocket feed for tracked server discovery and player counts, expandable status bars, additional server detail checks, client-side server filtering and sorting, per-device favorites, and a dark-first theme that follows the visitor's system color preference.
 
-Each expanded server row displays online/max players, a capacity meter, version, detected software, response time, resolved host/port, MOTD, any public player samples, and server/API diagnostics when available. The player graph and uptime strip use only status checks observed in the visitor's browser, stored locally for up to 24 hours and capped at 60 checks per server. New visitors start with an empty graph. A single API request is made per second and rotates through the list, so each of the ten listed realms is checked approximately every ten seconds. The provider may cache status results, and public server data may be unavailable or incomplete. Server favicons are shown when supplied by the status API; the site also uses Minecraft.net artwork with a CSS fallback.
+Expanded rows show live player counts, capacity when reported by the detail API, version, software, latency, host/port, MOTD, public player samples, and source-specific diagnostics. Live-feed servers are discovered and added automatically; direct detail checks continue in the background at one request per second, so each server is checked roughly once per list size in seconds. The graph stores up to 60 locally observed live-feed and direct-check samples per server for 24 hours; tooltips identify each sample's source. New visitors start with an empty local history.
 
-## Free status API
-
-The browser calls `https://api.mcsrvstat.us/3/{address}` directly. No API key or backend is required. The service documents support for status, player counts, version, software, MOTD and other optional fields. API availability, caching, and rate policies are outside this site's control. Review the provider's usage terms before operating at scale.
+Minetrack's public WebSocket at `wss://minetrack.me` supplies live tracked-server configuration, player counts, and probe errors. MineBeacon reconnects automatically and keeps its direct mcsrvstat checks for MOTD, version, software, and richer status details. The two sources can disagree, and the expanded row calls that out. Live feed servers are added to the directory automatically. The graph combines live-feed observations with this browser's direct detail checks, and tooltips identify the source.
 
 ## Run locally
 
