@@ -1,6 +1,8 @@
-# Blockwatch
+# MineBeacon
 
-A responsive, static Minecraft server status dashboard. It checks a starter watchlist and lets visitors look up any Java/Bedrock server hostname or IP.
+A responsive, Minecraft-inspired server status dashboard. It checks a starter watchlist and lets visitors look up any Java/Bedrock server hostname or IP.
+
+The watchlist makes one status API request per second, rotating between servers. With three servers, each individual server is checked about every three seconds. Polling pauses while the tab is hidden. Status APIs may cache results, so this cadence does not guarantee the Minecraft server itself was freshly pinged every second.
 
 ## Free status API
 

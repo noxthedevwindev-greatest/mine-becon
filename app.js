@@ -40,8 +40,25 @@ async function refreshCard(card) {
   }
 }
 
-$$('.server-card').forEach(refreshCard);
-$('#refresh-all').addEventListener('click', () => $$('.server-card').forEach(refreshCard));
+const watchCards = $$('.server-card');
+let rotationIndex = 0;
+let rotationBusy = false;
+refreshCard(watchCards[0]);
+rotationIndex = 1;
+setInterval(async () => {
+  if (document.hidden || rotationBusy || watchCards.length === 0) return;
+  rotationBusy = true;
+  await refreshCard(watchCards[rotationIndex % watchCards.length]);
+  rotationIndex += 1;
+  rotationBusy = false;
+}, 1000);
+$('#refresh-all').addEventListener('click', async () => {
+  if (rotationBusy) return;
+  rotationBusy = true;
+  await Promise.all(watchCards.map(refreshCard));
+  rotationIndex = (rotationIndex + 1) % Math.max(watchCards.length, 1);
+  rotationBusy = false;
+});
 
 $$('.copy').forEach(button => button.addEventListener('click', async () => {
   const address = button.closest('.server-card').dataset.address;
