@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101510">
+  <meta name="description" content="Live Minecraft server status, player counts, latency and Java/Bedrock support.">
+  <title>Blockwatch — Minecraft server pulse</title>
+  <link rel="preconnect" href="https://api.mcsrvstat.us">
+  <link rel="preconnect" href="https://api.mcstatus.io">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Blockwatch home"><span class="brand-mark">▦</span> blockwatch<span class="brand-dot">.</span></a>
+      <nav><a class="nav-active" href="#dashboard">Dashboard</a><a href="#how">How it works</a></nav>
+      <div class="live-pill"><i></i> LIVE MONITORING</div>
+    </header>
+
+    <main id="dashboard">
+      <section class="hero">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="eyebrow-line"></span> YOUR WORLD, AT A GLANCE</div>
+          <h1>Know when your<br><span>server is alive.</span></h1>
+          <p class="lede">Real-time Minecraft server status, player counts, and connection details. No account. No noise. Just the signal.</p>
+          <form id="lookup-form" class="search-box">
+            <span class="search-icon">⌕</span>
+            <input id="server-input" autocomplete="off" placeholder="Enter a server address…" aria-label="Minecraft server address" required>
+            <button type="submit">Check server <span>↗</span></button>
+          </form>
+          <div class="form-note"><span>↳</span> Java and Bedrock · hostname or IP</div>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+          <div class="pixel-world"><div class="cube cube-back"></div><div class="cube cube-front"></div><div class="cube cube-side"></div><div class="grass grass-one"></div><div class="grass grass-two"></div><div class="spark spark-one">✦</div><div class="spark spark-two">✧</div><div class="pixel-moon"></div></div>
+          <div class="art-caption"><span class="pulse-dot"></span> THE OVERWORLD IS CALLING</div>
+        </div>
+      </section>
+
+      <section class="dashboard-section">
+        <div class="section-head"><div><div class="eyebrow"><span class="eyebrow-line"></span> QUICK ACCESS</div><h2>Your watchlist<span class="muted-count" id="watch-count">03</span></h2></div><button id="refresh-all" class="refresh-button"><span>↻</span> Refresh all</button></div>
+        <div id="server-grid" class="server-grid" aria-live="polite">
+          <article class="server-card" data-address="mc.hypixel.net"><div class="card-top"><div class="server-icon icon-gold">H</div><span class="status-badge loading"><i></i> Checking</span></div><div class="server-name">Hypixel</div><div class="server-address">mc.hypixel.net <button class="copy" title="Copy address" aria-label="Copy mc.hypixel.net">▢</button></div><div class="player-row"><div><strong class="players">—</strong><span class="player-label">PLAYERS ONLINE</span></div><div class="sparkline" aria-hidden="true"><svg viewBox="0 0 100 28"><path d="M0 22 L12 17 L22 19 L33 11 L43 14 L55 7 L66 12 L77 5 L88 8 L100 2"/></svg></div></div><div class="card-foot"><span class="edition">JAVA EDITION</span><span class="latency">— ms</span></div></article>
+          <article class="server-card" data-address="play.cubecraft.net"><div class="card-top"><div class="server-icon icon-blue">C</div><span class="status-badge loading"><i></i> Checking</span></div><div class="server-name">CubeCraft</div><div class="server-address">play.cubecraft.net <button class="copy" title="Copy address" aria-label="Copy play.cubecraft.net">▢</button></div><div class="player-row"><div><strong class="players">—</strong><span class="player-label">PLAYERS ONLINE</span></div><div class="sparkline blue" aria-hidden="true"><svg viewBox="0 0 100 28"><path d="M0 20 L12 17 L22 21 L33 12 L43 16 L55 9 L66 13 L77 6 L88 10 L100 3"/></svg></div></div><div class="card-foot"><span class="edition">JAVA EDITION</span><span class="latency">— ms</span></div></article>
+          <article class="server-card" data-address="play.pika-network.net"><div class="card-top"><div class="server-icon icon-purple">P</div><span class="status-badge loading"><i></i> Checking</span></div><div class="server-name">PikaNetwork</div><div class="server-address">play.pika-network.net <button class="copy" title="Copy address" aria-label="Copy play.pika-network.net">▢</button></div><div class="player-row"><div><strong class="players">—</strong><span class="player-label">PLAYERS ONLINE</span></div><div class="sparkline purple" aria-hidden="true"><svg viewBox="0 0 100 28"><path d="M0 23 L12 18 L22 20 L33 14 L43 17 L55 8 L66 14 L77 7 L88 9 L100 2"/></svg></div></div><div class="card-foot"><span class="edition">JAVA EDITION</span><span class="latency">— ms</span></div></article>
+        </div>
+        <div id="lookup-result" class="lookup-result" hidden></div>
+      </section>
+
+      <section id="how" class="bottom-note"><div class="note-icon">✳</div><div><strong>Fresh signal, every time.</strong><p>Checks are fetched live from public Minecraft status endpoints when you load or refresh. We don't store your searches.</p></div><div class="api-tag">POWERED BY <b>MCSRVSTAT.US</b></div></section>
+    </main>
+    <footer><span>© 2026 BLOCKWATCH</span><span>Made for the love of the game <b>♥</b></span><span>Not affiliated with Mojang or Microsoft</span></footer>
+  </div>
+  <script src="app.js" defer></script>
+</body>
+</html>
