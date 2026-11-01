@@ -30,6 +30,7 @@ function makeCard(server, index) {
       <div class="detail-grid"><div><small>GAME VERSION</small><strong class="version">Unknown</strong></div><div><small>SOFTWARE</small><strong class="software">Unknown</strong></div><div><small>RESPONSE</small><strong class="latency">—</strong></div><div><small>PORT / HOST</small><strong class="host-info">—</strong></div></div>
       <div class="motd-box"><small>SERVER MESSAGE / MOTD</small><p class="motd">Waiting for server response…</p></div>
       <div class="server-error" hidden><small>SERVER / API DIAGNOSTIC</small><p class="error-message"></p></div>
+      <div class="favorite-row"><button class="favorite-toggle" type="button" aria-pressed="false">☆ Add to favorites</button><span class="favorite-note">Saved on this device</span></div>
       <div class="sample-row"><div><small>PLAYERS ONLINE</small><div class="sample-players">Player list is not public.</div></div><button class="copy" type="button" title="Copy server address">COPY ADDRESS</button></div>
     </div>`;
   const button = $('.realm-bar', card);
@@ -43,12 +44,58 @@ function makeCard(server, index) {
     try { await navigator.clipboard.writeText(server.address); $('.copy', card).textContent = 'COPIED'; setTimeout(() => { $('.copy', card).textContent = 'COPY ADDRESS'; }, 1200); }
     catch { $('.copy', card).textContent = server.address; }
   });
+  $('.favorite-toggle', card).addEventListener('click', () => toggleFavorite(card));
   return card;
 }
 
 SERVERS.forEach((server, index) => grid.append(makeCard(server, index)));
 $('#watch-count').textContent = String(SERVERS.length).padStart(2, '0');
 const watchCards = $$('.realm', grid);
+const FAVORITES_KEY = 'minebeacon:favorites:v1';
+let favorites = new Set();
+try { favorites = new Set(JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]')); } catch { /* Favorites remain usable for this session. */ }
+let favoritesOnly = false;
+
+function toggleFavorite(card) {
+  const address = card.dataset.address;
+  if (favorites.has(address)) favorites.delete(address);
+  else favorites.add(address);
+  try { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favorites])); } catch { /* Storage may be unavailable. */ }
+  const button = $('.favorite-toggle', card);
+  const active = favorites.has(address);
+  button.setAttribute('aria-pressed', String(active));
+  button.textContent = active ? '★ Saved to favorites' : '☆ Add to favorites';
+  arrangeServers();
+}
+
+function arrangeServers() {
+  const query = $('#server-filter').value.trim().toLocaleLowerCase();
+  const sort = $('#server-sort').value;
+  const cards = [...watchCards];
+  cards.forEach(card => {
+    const searchText = `${card.querySelector('.realm-title').textContent} ${card.querySelector('.realm-type').textContent}`.toLocaleLowerCase();
+    card.hidden = Boolean(query && !searchText.includes(query)) || (favoritesOnly && !favorites.has(card.dataset.address));
+  });
+  if (sort === 'players') cards.sort((a, b) => Number(b.dataset.players ?? -1) - Number(a.dataset.players ?? -1));
+  if (sort === 'name') cards.sort((a, b) => a.querySelector('.realm-title strong').textContent.localeCompare(b.querySelector('.realm-title strong').textContent));
+  if (sort === 'status') cards.sort((a, b) => Number(b.dataset.online === 'true') - Number(a.dataset.online === 'true'));
+  cards.forEach(card => grid.append(card));
+}
+
+$('#server-filter').addEventListener('input', arrangeServers);
+$('#server-sort').addEventListener('change', arrangeServers);
+$('#favorites-filter').addEventListener('click', event => {
+  favoritesOnly = !favoritesOnly;
+  event.currentTarget.setAttribute('aria-pressed', String(favoritesOnly));
+  event.currentTarget.textContent = favoritesOnly ? '★ Favorites' : '☆ Favorites';
+  arrangeServers();
+});
+watchCards.forEach(card => {
+  const button = $('.favorite-toggle', card);
+  const active = favorites.has(card.dataset.address);
+  button.setAttribute('aria-pressed', String(active));
+  button.textContent = active ? '★ Saved to favorites' : '☆ Add to favorites';
+});
 
 async function checkServer(address) {
   const response = await fetch(`${API}${encodeURIComponent(address)}`, { signal: AbortSignal.timeout(10000) });
@@ -121,6 +168,8 @@ function apiErrorMessage(data) {
 
 function updateCard(card, data, elapsed, requestError = '') {
   const online = Boolean(data.online);
+  card.dataset.online = String(online);
+  card.dataset.players = online ? String(Number(data.players?.online) || 0) : '-1';
   const badge = $('.status-badge', card);
   badge.className = `status-badge ${online ? 'online' : 'offline'}`;
   badge.innerHTML = `<i></i>${online ? 'ONLINE' : 'OFFLINE'}`;
@@ -151,6 +200,7 @@ function updateCard(card, data, elapsed, requestError = '') {
   $('.realm-bar', card).setAttribute('aria-label', `${card.querySelector('.realm-title strong').textContent}: ${online ? 'online' : 'offline'}, ${onlineCount ?? 'unknown'} players. Expand for details.`);
   recordObservation(card.dataset.address, data, requestError);
   renderHistory(card);
+  arrangeServers();
 }
 
 async function refreshCard(card) {
